@@ -1,0 +1,34 @@
+{
+  "name": "visualspace",
+  "version": "1.0.0",
+  "description": "Project which help you to buy real estate using \u001b[C\u001b[C\u001b[C\u001b[C\u001b[C\u001b[C\u001b[C\u001b[C\u001b[C\u001b[C\u001b[C\u001b[C\u001b[C\u001b[C\u001b[C\u001b[C\u001b[C\u001b[C\u001b[\u001b[D\u001b[D\u001b[Doject will help you to buy the real estate for one click",
+  "main": "index.js",
+  "scripts": {
+    "test": "test"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/nikolaysalinder/visualspace.git"
+  },
+  "keywords": [
+    "vr",
+    "virtual",
+    "reality",
+    "one",
+    "click",
+    "VR-platform",
+    "marketplace",
+    "for",
+    "realty"
+  ],
+  "author": "nikolaysalinder",
+  "license": "GPL-3.0",
+  "bugs": {
+    "url": "https://github.com/nikolaysalinder/visualspace/issues"
+  },
+  "homepage": "https://github.com/nikolaysalinder/visualspace#readme",
+  "dependencies": {
+    "express": "^4.14.0",
+    "express-handlebars": "^3.0.0"
+  }
+}
