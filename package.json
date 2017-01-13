@@ -1,34 +1,32 @@
 {
-  "name": "visualspace",
-  "version": "1.0.0",
-  "description": "Project which help you to buy real estate using \u001b[C\u001b[C\u001b[C\u001b[C\u001b[C\u001b[C\u001b[C\u001b[C\u001b[C\u001b[C\u001b[C\u001b[C\u001b[C\u001b[C\u001b[C\u001b[C\u001b[C\u001b[C\u001b[\u001b[D\u001b[D\u001b[Doject will help you to buy the real estate for one click",
+  "name": "meadowlark-travel",
+  "version": "0.0.1",
+  "description": "Studying express and node \u001b[C\u001b[C\u001b[C\u001b[C\u001b[C\u001b[C\u001b[C\u001b[C\u001b[C\u001b[C\u001b[C\u001b[C\u001b[C\u001b[C\u001b[C\u001b[C\u001b[C\u001b[C\u001b[\u001b[D\u001b[D\u001b[Doject will help you to buy the real estate for one click",
   "main": "index.js",
   "scripts": {
     "test": "test"
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/nikolaysalinder/visualspace.git"
+    "url": "git+https://github.com/nikolaysalinder/meadowlark-travel.git"
   },
   "keywords": [
-    "vr",
-    "virtual",
-    "reality",
-    "one",
-    "click",
-    "VR-platform",
-    "marketplace",
-    "for",
-    "realty"
+    "express",
+    "study"
   ],
   "author": "nikolaysalinder",
-  "license": "GPL-3.0",
+  "license": "MIT",
   "bugs": {
-    "url": "https://github.com/nikolaysalinder/visualspace/issues"
+    "url": "https://github.com/nikolaysalinder/meadowlark-travel/issues"
   },
-  "homepage": "https://github.com/nikolaysalinder/visualspace#readme",
+  "homepage": "https://github.com/nikolaysalinder/meadowlark-travel#readme",
   "dependencies": {
     "express": "^4.14.0",
     "express-handlebars": "^3.0.0"
+  },
+  "devDependencies": {
+    "chai": "^3.5.0",
+    "mocha": "^3.2.0",
+    "zombie": "^5.0.5"
   }
 }
