@@ -19,7 +19,7 @@ suite('Межстраничные тесты', function() {
 				//Right search on the page hidden input with name referrer in documentation Zombie@5.0.5
 				// Uncaught AssertionError: Unspecified AssertionError 
 				// at qa\tests-crosspage.js:
-				assert(browser.field('referrer').value === referrer);
+				browser.assert.element('form input[name=referrer]', referrer);
 				done();
 			});
 		});
@@ -53,6 +53,4 @@ suite('Межстраничные тесты', function() {
 			done();
 		});
 	});
-});
-
-// git commit -m "Исправил ошибку в файле index.js Error: Missing helper 'section' . Установил zombie@5.0.5 для windows, изменил код в 'qa/tests-crosspage.js' чтобы функции выполнялись коректно"
+}); 

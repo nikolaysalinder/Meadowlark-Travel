@@ -1,11 +1,23 @@
 <!DOCTYPE html>
-<html>
+<!--[if lt IE 7]>      <html class="no-js lt-ie9 lt-ie8 lt-ie7"> <![endif]-->
+<!--[if IE 7]>         <html class="no-js lt-ie9 lt-ie8"> <![endif]-->
+<!--[if IE 8]>         <html class="no-js lt-ie9"> <![endif]-->
+<!--[if gt IE 8]><!--> <html class="no-js"> <!--<![endif]-->
 <head>
-  <title>Medowlark Travel</title>
+  <meta charset="utf-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+  <title>Meadowlark Travel</title>
   {{#if showTests}}
     <link rel="stylesheet" href="/vendor/mocha.css">
   {{/if}}
-  <script src="//code.jquery.com/jquery-2.0.2.min.js"></script>
+  {{{_sections.head}}}
+  <meta name="description" content="">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+
+  <link rel="stylesheet" href="/vendor/bootstrap/css/bootstrap.min.css">
+  <link rel="stylesheet" href="/css/style.css">
+
+  <script src="/vendor/js/modernizr-2.6.2-respond-1.1.0.min.js"></script>
 </head>
 <body>
   {{#if showTests}}
@@ -25,6 +37,11 @@
   <header>
     <img src="/img/logo.png" alt="Meadowlark Travel Logo">
   </header>
-{{{body}}}
+  {{{body}}}
+  <script>window.jQuery || document.write('<script src="/vendor/js/jquery-2.1.1.min.js"><\/script>')</script>
+  <script src="http://code.jquery.com/jquery-2.0.2.min.js"></script>
+  {{{_sections.jquery}}}
+  <script src="/vendor/bootstrap/js/bootstrap.min.js"></script>
+  <script src="/js/main.js"></script>
 </body>
 </html>
