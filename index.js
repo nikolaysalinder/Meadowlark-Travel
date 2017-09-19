@@ -44,7 +44,7 @@ function getWeatherData(){
       {
         name: 'Бенд',
         forecastUrl: 'http://www.wunderground.com/US/OR/Bend.html',
-        iconUrl: 'https://icons.wxug.com/i/c/k/v4/cloudy.svg',
+        iconUrl: 'https://icons.wxug.com/i/c/v4/cloudy.svg',
         weather: 'Малооблачно',
         temp: '55.0 F (12.8 C)'
       },

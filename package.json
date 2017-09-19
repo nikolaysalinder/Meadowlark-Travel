@@ -1,7 +1,7 @@
 {
   "name": "meadowlark-travel",
   "version": "0.0.1",
-  "description": "Studying express and node \u001b[C\u001b[C\u001b[C\u001b[C\u001b[C\u001b[C\u001b[C\u001b[C\u001b[C\u001b[C\u001b[C\u001b[C\u001b[C\u001b[C\u001b[C\u001b[C\u001b[C\u001b[C\u001b[\u001b[D\u001b[D\u001b[Doject will help you to buy the real estate for one click",
+  "description": "Studying express and node ",
   "main": "index.js",
   "scripts": {
     "test": "test"
