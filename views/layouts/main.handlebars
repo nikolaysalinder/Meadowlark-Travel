@@ -37,6 +37,17 @@
   <header>
     <img src="/img/logo.png" alt="Meadowlark Travel Logo">
   </header>
+  {{#if flash}}
+    <div class="alert alert-dismissible alert-{{flash.type}}">
+      <button 
+        type="submit" 
+        class="close"
+        data-dismiss="alert"
+        aria-hidden="true"
+      >&times;</button>
+      <strong>{{flash.intro}}</strong>{{{flash.message}}}
+    </div>
+  {{/if}}
   {{{body}}}
   <script>window.jQuery || document.write('<script src="/vendor/js/jquery-2.1.1.min.js"><\/script>')</script>
   <script src="http://code.jquery.com/jquery-2.0.2.min.js"></script>
