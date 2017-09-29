@@ -2,6 +2,7 @@ var express = require('express');
 var formidable = require('formidable');
 var jqupload = require('jquery-file-upload-middleware');
 var nodemailer = require('nodemailer');
+var csurf = require('csurf');
 
 
 var app = express();
@@ -10,7 +11,7 @@ var credentials = require('./credentials.js');
 var fortune = require('./lib/fortune.js');
 var cartValidation = require('./lib/tourRequiresWaiver.js');
 
-let transporter = nodemailer.createTransport({
+var transporter = nodemailer.createTransport({
   // эти строчки необходимы для того чтобы не было ошибки this.transporter.mailer = this
   // но перед этим необходимо перейти в свой аккаунт гугл и разрешить доступ приложениям https://myaccount.google.com/lesssecureapps
   // This code is nessesery to avoid Error this.transporter.mailer = this 
@@ -66,11 +67,14 @@ app.use(require('express-session')({
 }));
 app.use(express.static(__dirname + '/public'));
 app.use(require('body-parser').urlencoded({ extended: true }));
+//app.use(csurf);
 
 
 
-// Обработчик событий Flash message
+// Обработчик событий Flash message 
 app.use(function(req, res, next){
+  //если есть флэш сообщение то
+  //присвоаиваем в контекст ответа и удаляем
   res.locals.flash = req.session.flash;
   delete req.session.flash;
   next();
@@ -90,7 +94,7 @@ function getWeatherData(){
         forecastUrl: 'http://www.wunderground.com/US/OR/Portland.html',
         iconUrl: 'https://icons.wxug.com/i/c/v4/cloudy.svg',
         weather: 'Сплошая облачность',
-        tepm: '54.1 F (12.3 C)'
+        temp: '54.1 F (12.3 C)'
       },
       {
         name: 'Бенд',
@@ -109,7 +113,7 @@ function getWeatherData(){
     ]
   };
 }
-
+// промежуточная функция для добавления погоды в контекст
 app.use(function(req,res, next){
   if(!res.locals.partials) res.locals.partials = {};
   res.locals.partials.weatherContext = getWeatherData();
@@ -138,7 +142,7 @@ NewsletterSignup.prototype.save = function(cb){
   cb();
 };
 
-// mocking product database
+// Шаблон для искусственной базы данных
 function Product(){
 }
 Product.find = function(conditions, fields, options, cb){
@@ -229,16 +233,24 @@ app.post('/newsletter', function(req, res){
       return res.redirect(303, '/newsletter/archive');
     };
     if(req.xhr) return res.json({succes: true});
-  })
-  res.session.flash = {
-    type: 'succes',
-    intro: 'Thank you!',
-    message: 'You have now been signed up for the newsletter.'
-  };
-  return res.redirect(303, '/newsletter/archive');
+    req.session.flash = {
+      type: 'succes',
+      intro: 'Thank you!',
+      message: 'You have now been signed up for the newsletter.'
+    };
+    return res.redirect(303, '/newsletter/archive');
+  });
 });
 app.get('/newsletter/archive', function(req, res){
   res.render('newsletter/archive');
+});
+
+app.get('/contest/vacation-photo', function(req, res){
+  var now = new Date();
+  res.render('contest/vacation-photo', {
+    year: now.getFullYear(),
+    month: now.getMonth()
+  });
 });
 
 app.post('/process', function(req, res){
@@ -272,7 +284,7 @@ app.get('/data/nursery-rhyme', function(req, res){
 });
 
 app.post('/process', function(req, res){
-  if(res.xhr || req.accepts('json.html' )=== 'json'){
+  if(req.xhr || req.accepts('json.html' )=== 'json'){
     res.send({success: true});
   } else {
     res.redirect(303, '/thank-you');
@@ -283,17 +295,17 @@ app.get('/jquery-test', function(req, res){
   res.render('jquery-test');
 });
 
-app.get('/tours/hood-river', function(req, res){
-  res.render('tours/hood-river');
-});
+// app.get('/tours/hood-river', function(req, res){
+//   res.render('tours/hood-river');
+// });
 
-app.get('/tours/oregon-coast', function(req, res){
-  res.render('tours/oregon-coast');
-});
+// app.get('/tours/oregon-coast', function(req, res){
+//   res.render('tours/oregon-coast');
+// });
 
-app.get('/tours/request-group-rate', function(req, res){
-  res.render('tours/request-group-rate'); 
-});
+// app.get('/tours/request-group-rate', function(req, res){
+//   res.render('tours/request-group-rate'); 
+// });
 
 app.get('/', function(req, res){
   res.render('home');
@@ -308,16 +320,6 @@ app.get('/about', function(req,res){
 
 app.get('/thank-you', function(req, res){
   res.render('thank-you');
-});
-
-
-
-app.get('/contest/vacation-photo', function(req, res){
-  var now = new Date();
-  res.render('contest/vacation-photo', {
-    year: now.getFullYear(),
-    month: now.getMonth()
-  });
 });
 
 app.post('/contest/vacation-photo/:year/:month', function(req, res){
@@ -353,20 +355,70 @@ app.use(cartValidation.checkWaivers);
 app.use(cartValidation.checkGuestCounts);
 
 app.post('/cart/add', function(req, res, next){
-  var cart = req.session.cart || (req.session.cart = []);
+  var cart = req.session.cart || (req.session.cart = {items: [] });
   Product.findOne({ sku: req.body.sku }, function(err, product){
     if(err) return next(err);
     if(!product) return next(new Error('Unknown product SKU: ' + req.body.sku));
-    cart.push({
+    cart.items.push({
       product: product,
       guests: req.body.guests || 0,
     });
     res.redirect(303, '/cart');
   });
 });
-app.get('/cart', function(req, res){
-  var cart = req.session.cart || (req.session.cart = []);
+
+
+app.get('/cart', function(req, res, next){
+  var cart = req.session.cart;
+  if(!cart) next();
   res.render('cart', { cart: cart });
+});
+
+app.get('/cart/checkout', function(req, res, next){
+  var cart = req.session.cart;
+  if(!cart) next();
+  res.render('cart-checkout');
+});
+
+app.get('/cart/thank-you', function(req, res){
+  res.render('cart-thank-you', { cart: req.session.cart });
+});
+
+app.get('/email/cart/thank-you', function(req, res){
+  res.render('email/cart-thank-you', { cart: req.session.cart, layout: null });
+});
+
+app.post('/cart/checkout', function(req, res, next){
+  var cart = req.session.cart;
+  if(!cart) return next(new Error('Корзина не существует.'));
+  var name = req.body.name || '',
+      email = req.body.email || '';
+  // проверка вводимых данных
+  if(!email.match(VALID_EMAIL_REGEX)){
+    return res.next(new Error('некорректный адресс электронной почты'));
+  }
+  //Присваиваем случайный идентификатор корзины
+  //При обычных условиях мы бы использовали здесь идентификатор из БД
+  cart.number = Math.random().toString().replace(/^0\.0*/,'');
+  cart.billing = {
+    name: name,
+    email: email,
+  },
+  res.render('email/cart-thank-you',{layout: null, cart: cart}, function(err,  html){
+    if(err) console.log('Ошибка в шаблоне письма');
+    transporter.sendMail({
+      from: '"Meadow-lark Travel": <info@meadowlarktravel.com>',
+      to: cart.billing.email,
+      subject: 'Спасибо за заказ поездки в Meadowlarktravel',
+      html: html,
+      generateTextFromHtml: true
+    }, function(err){
+      if(err){
+        console.error('Не могу отправить подтверждение: ' + err.stack);
+      }
+    });
+  });
+  res.render('cart-thank-you', {cart: cart});
 });
 
 

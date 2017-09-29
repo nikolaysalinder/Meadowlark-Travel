@@ -1,4 +1,4 @@
-<h1>Your Shopping Cart</h1>
+<h1>Твоя корзина Вась</h1>
 {{#each cart.errors}}
 	<div class="alert alert-danger">{{.}}</div>
 {{/each}}
@@ -9,12 +9,12 @@
 <table class="table table-striped">
 	<thead>
 		<tr>
-			<td>Vacation</td>
-			<td>Guests</td>
+			<td>Резервирование</td>
+			<td>Количество гостей</td>
 		</tr>
 	</thead>
 	<tbody>
-		{{#each cart}}
+		{{#each cart.items}}
 			<tr>
 				<td>{{product.name}}</td>
 				<td>{{guests}}</td>
@@ -22,3 +22,5 @@
 		{{/each}}
 	</tbody>
 </table>
+
+<a class="btn btn-primary" href="/cart/checkout">Checkout</a>
