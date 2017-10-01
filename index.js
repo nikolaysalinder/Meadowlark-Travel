@@ -1,3 +1,4 @@
+var http = require('http');
 var express = require('express');
 var formidable = require('formidable');
 var jqupload = require('jquery-file-upload-middleware');
@@ -59,6 +60,65 @@ app.set('view engine', 'handlebars');
 
 app.set('port', process.env.port || 3000);
 
+// позволяет обрабатывать ошибки
+app.use(function(req, res, next){
+    // создаем домен
+    var domain = require('domain').create();
+    // обрабатываем ошибки на этом домене
+    domain.on('error', function(err){
+        console.error('Перехвачена ошибка домена\n', err.stack);
+        try {
+            // Отказобезопасный останов через 5 секунд
+            setTimeout(function(){
+                console.error('Отказобезопасный останов');
+                process.exit(1);
+            }, 15000);
+
+            // Отключение от кластера
+            var worker = require('cluster').worker;
+            if(worker) worker.disconnect();
+
+            // прекращение принятя новых запросов
+            server.close();
+
+            try {
+                // пытаемся обработать ошибки в express
+                next(err);
+            } catch(error){
+                // если express обработчик ошибок не сработал 
+                // пробуем выдать текстовый ответ node
+                console.error('Express error mechanism failed.\n', error.stack);
+                res.statusCode = 500;
+                res.setHeader('content-type', 'text/plain');
+                res.end('Ошибка сервера.');
+            }
+        } catch(error){
+            console.error('Невозможно отправить отввет 500.\n', error.stack);
+        }
+    });
+
+    // добавляем объекты запроса и ответа в домен
+    domain.add(req);
+    domain.add(res);
+
+    // выполняем оставшиеся цепочки запроса в домене
+    domain.run(next);
+});
+
+switch(app.get('env')){
+  case 'development': 
+    //сжатое многоцветовое журналирование для разработки
+    app.use(require('morgan')('dev'));
+    break;
+  case 'production':
+    //Модуль express-logger поддерживает ежедневное 
+    //чередование файлов журнала
+    app.use(require('express-logger')({
+      path: __dirname + '/log/requests.log'
+    }));
+    break;
+}
+
 app.use(require('cookie-parser')(credentials.cookieSecret));
 app.use(require('express-session')({
   resave: false,
@@ -69,7 +129,11 @@ app.use(express.static(__dirname + '/public'));
 app.use(require('body-parser').urlencoded({ extended: true }));
 //app.use(csurf);
 
-
+app.use(function(req, res, next){
+  var cluster = require('cluster');
+  if(cluster.isWorker) console.log('Исполнитель %d получил запрос', cluster.worker.id);
+  next();
+});
 
 // Обработчик событий Flash message 
 app.use(function(req, res, next){
@@ -367,7 +431,9 @@ app.post('/cart/add', function(req, res, next){
   });
 });
 
-
+app.get('/fail', function(req, res){
+  throw new Error('Нет!');
+})
 app.get('/cart', function(req, res, next){
   var cart = req.session.cart;
   if(!cart) next();
@@ -388,9 +454,9 @@ app.get('/email/cart/thank-you', function(req, res){
   res.render('email/cart-thank-you', { cart: req.session.cart, layout: null });
 });
 
-app.post('/cart/checkout', function(req, res, next){
+app.post('/cart/checkout', function(req, res){
   var cart = req.session.cart;
-  if(!cart) return next(new Error('Корзина не существует.'));
+  if(!cart) next(new Error('Корзина не существует.'));
   var name = req.body.name || '',
       email = req.body.email || '';
   // проверка вводимых данных
@@ -421,6 +487,11 @@ app.post('/cart/checkout', function(req, res, next){
   res.render('cart-thank-you', {cart: cart});
 });
 
+app.get('/epic-fail', function(req, res){
+    process.nextTick(function(){
+        throw new Error('Бабах!');
+    });
+});
 
 // Обобщенный обработчик 404 (промежуточное ПО)
 app.use(function(req, res) {
@@ -435,6 +506,22 @@ app.use(function(err, req, res, next){
   res.render('500');
 });
 
-app.listen(app.get('port'), function(){
-  console.log( 'Express запущен на http://localhost:' + app.get('port') + ':нажмите Ctrl+C для завершения.' );
-});
+var server;
+
+function startServer() {
+    server = http.createServer(app).listen(app.get('port'), function(){
+      console.log( 'Экспресс запущен в режиме ' + app.get('env') +
+        ' на http://localhost:' + app.get('port') +
+        '; нажми Ctrl-C для выхода.' );
+    });
+}
+
+if(require.main === module){
+  //приложение запускается непосредственно,
+  //запускаем сервер приложения
+  startServer();
+}else{
+  //приложение импортируется как модуль
+  //экспортируем функция для создания сервера
+  module.exports = startServer;
+}
