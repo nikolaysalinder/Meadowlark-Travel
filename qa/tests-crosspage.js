@@ -46,7 +46,7 @@ suite('Межстраничные тесты', function() {
 			//Корректный поиск на странице - input с именем referrer в документации Zombie@5.0.5
 			// Uncaught AssertionError: Unspecified AssertionError 
 			// at qa\tests-crosspage.js:
-			//Right search on the page hidden input with name referrer in documentation Zombie@5.0.5
+			//Correct search on the page hidden input with name referrer in documentation Zombie@5.0.5
 			// Uncaught AssertionError: Unspecified AssertionError 
 			// at qa\tests-crosspage.js:
 			browser.assert.element('form input[name=referrer]', '');

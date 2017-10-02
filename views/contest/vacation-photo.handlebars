@@ -1,6 +1,6 @@
 <form class="form-horizontal" role="form" 
 		enctype="multipart/form-data" method="POST"
-		action="/contest/vacation-photo/{{year}}/{{month}}">
+		action="/contest/vacation-photo/{year}/{month}">
 	<div class="form-group">
 		<label for="fieldName" class="col-sm-2 control-label">Name</label>
 		<div class="col-sm-4">
@@ -16,10 +16,10 @@
 		</div>
 	</div>
 	<div class="form-group">
-		<label for="fieldPhoto" class="col-sm-2 control-label">Vacation photo</label>
+		<label for="fieldPhoto" class="col-sm-2 control-label">Вакансии фото</label>
 		<div class="col-sm-4">
 			<span class="btn btn-default btn-file">
-				Upload
+				Загрузить
 				<input type="file" class="form-control" required accept="image/*"
 					id="fieldPhoto" data-url="/upload" multiple name="photo">
 			</span>
@@ -28,29 +28,9 @@
 	</div>
 	<div class="form-group">
 		<div class="col-sm-offset-2 col-sm-4">
-			<button type="submit" class="btn btn-primary">Submit</button>
+			<button type="submit" class="btn btn-primary">Отправить</button>
 		</div>
 	</div>
 </form>
 
-{{#section 'jquery'}}
-	<script src="/vendor/jquery-file-upload/js/vendor/jquery.ui.widget.js"></script>
-	<script src="/vendor/jquery-file-upload/js/jquery.iframe-transport.js"></script>
-	<script src="/vendor/jquery-file-upload/js/jquery.fileupload.js"></script>
-	<script>
-		$(document).ready(function(){
 
-			$('#fieldPhoto').fileupload({
-				dataType: 'json',
-				done: function(e, data){
-					$.each(data.result.files, function(index, file){
-						$('#fileUploads').append($('<div class="upload">' +
-							'<span class="glyphicon glyphicon-ok"></span>&nbsp;' +
-							file.originalName + '</div>'));
-					});
-				}
-			});
-
-		});
-	</script>
-{{/section}}
