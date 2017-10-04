@@ -1,51 +1,19 @@
-var http = require('http');
-var express = require('express');
-var formidable = require('formidable');
-var jqupload = require('jquery-file-upload-middleware');
-var nodemailer = require('nodemailer');
-var csurf = require('csurf');
-var fs = require('fs');
+let http = require('http');
+let express = require('express');
+let formidable = require('formidable');
+let nodemailer = require('nodemailer');
+let fs = require('fs');
+let Vacation = require('./models/vacation.js');
+let VacationInSeasonListener = require('./models/vacationInSeasonListener.js');
 
+let app = express();
 
+let credentials = require('./credentials.js');
 
-var app = express();
-
-var credentials = require('./credentials.js');
-var fortune = require('./lib/fortune.js');
-var cartValidation = require('./lib/tourRequiresWaiver.js');
-
-var transporter = nodemailer.createTransport({
-  // эти строчки необходимы для того чтобы не было ошибки this.transporter.mailer = this
-  // но перед этим необходимо перейти в свой аккаунт гугл и разрешить доступ приложениям https://myaccount.google.com/lesssecureapps
-  // This code is nessesery to avoid Error this.transporter.mailer = this 
-  // But first you need to login in your gmail account https://myaccount.google.com/lesssecureapps and turn on access applications with low security level
-  service: 'gmail',
-  secure: false,
-  port: 25,
-  auth: {
-    user: credentials.gmail.user,
-    pass: credentials.gmail.password
-  },
-  tls: {
-    rejectUnauthorized: false
-  }
-});
-// transporter.sendMail({
-//   from: '"John" <foo@gmail.com>',
-//   to: 'bar@gmail.com, "Vasya" <foo@gmail.com>',
-//   subject: 'It\'s third letter',
-//   text: 'Текст сообщения тут'
-// }, function(err, res){
-//   if(err){ 
-//     console.log('Невозможно отправить письмо' + err);
-//   } else {
-//     console.log('Сообщение отправлено');
-//     console.log(res);
-//   }
-// });
+let fortune = require('./lib/fortune.js');
 
 // Установка механизма представления HTML handlebars
-var handlebars = require('express-handlebars').create({
+let handlebars = require('express-handlebars').create({
   defaultLayout:'main',
   //этот код надо внести для того чтобы не было Error: Missing helper "section"
   //this code is necessary to avoid Error: Missing helper "section"
@@ -62,51 +30,52 @@ app.set('view engine', 'handlebars');
 
 app.set('port', process.env.port || 3000);
 
-// позволяет обрабатывать ошибки
+// позволяет лучше перехватывать ошибки 
 app.use(function(req, res, next){
-    // создаем домен
-    var domain = require('domain').create();
-    // обрабатываем ошибки на этом домене
-    domain.on('error', function(err){
-        console.error('Перехвачена ошибка домена\n', err.stack);
-        try {
-            // Отказобезопасный останов через 5 секунд
-            setTimeout(function(){
-                console.error('Отказобезопасный останов');
-                process.exit(1);
-            }, 15000);
+  // создаем домен
+  let domain = require('domain').create();
+  // обрабатываем ошибки на этом домене
+  domain.on('error', function(err){
+    console.error('Перехвачена ошибка домена\n', err.stack);
+    try {
+      // Отказобезопасный останов через 5 секунд
+      setTimeout(function(){
+        console.error('Отказобезопасный останов');
+        process.exit(1);
+      }, 15000);
 
-            // Отключение от кластера
-            var worker = require('cluster').worker;
-            if(worker) worker.disconnect();
+      // Отключение от кластера
+      let worker = require('cluster').worker;
+      if(worker) worker.disconnect();
 
-            // прекращение принятя новых запросов
-            server.close();
+      // прекращение принятя новых запросов
+      server.close();
 
-            try {
-                // пытаемся обработать ошибки в express
-                next(err);
-            } catch(error){
-                // если express обработчик ошибок не сработал 
-                // пробуем выдать текстовый ответ node
-                console.error('Express error mechanism failed.\n', error.stack);
-                res.statusCode = 500;
-                res.setHeader('content-type', 'text/plain');
-                res.end('Ошибка сервера.');
-            }
-        } catch(error){
-            console.error('Невозможно отправить отввет 500.\n', error.stack);
-        }
-    });
+      try {
+        // пытаемся обработать ошибки в express
+        next(err);
+      } catch(error){
+        // если express обработчик ошибок не сработал 
+        // пробуем выдать текстовый ответ node
+        console.error('Обработчик ошибок экспресс не сработал.\n', error.stack);
+        res.statusCode = 500;
+        res.setHeader('content-type', 'text/plain');
+        res.end('Ошибка сервера.');
+      }
+    } catch(error){
+      console.error('Невозможно отправить ответ 500.\n', error.stack);
+    }
+  });
 
-    // добавляем объекты запроса и ответа в домен
-    domain.add(req);
-    domain.add(res);
+  // добавляем объекты запроса и ответа в домен
+  domain.add(req);
+  domain.add(res);
 
-    // выполняем оставшиеся цепочки запроса в домене
-    domain.run(next);
+  // выполняем оставшиеся цепочки запроса в домене
+  domain.run(next);
 });
 
+// Логирование
 switch(app.get('env')){
   case 'development': 
     //сжатое многоцветовое журналирование для разработки
@@ -121,20 +90,86 @@ switch(app.get('env')){
     break; 
 }
 
+let MongoSessionStore = require('session-mongoose')(require('connect'));
+let sessionStore = new MongoSessionStore({ url: credentials.mongo[app.get('env')].connectionString });
+
 app.use(require('cookie-parser')(credentials.cookieSecret));
 app.use(require('express-session')({
   resave: false,
   saveUninitialized: false,
-  secret: credentials.cookieSecret
+  secret: credentials.cookieSecret,
+  store: sessionStore
 }));
+
 app.use(express.static(__dirname + '/public'));
 app.use(require('body-parser').urlencoded({ extended: true }));
 //app.use(csurf);
 
-app.use(function(req, res, next){
-  var cluster = require('cluster');
-  if(cluster.isWorker) console.log('Исполнитель %d получил запрос', cluster.worker.id);
-  next();
+//конфигурация базы данных
+var mongoose = require('mongoose');
+let options = {
+  server: {
+    socketOptions: { keepAlive: 1 }
+  }
+};
+
+switch(app.get('env')){
+  case 'development':
+    mongoose.connect(credentials.mongo.development.connectionString, options);
+    break;
+  case 'production':
+    mongoose.connect(credentials.mongo.production.connectionString, options);
+    break;
+  default:
+    throw new Error('Незнакомая среда выполнения : ' + app.get('env'));
+}
+
+Vacation.find(function(err, vacations){
+  if(vacations.length) return;
+
+  new Vacation({
+    name: 'Hood River Day Trip',
+    slug: 'hood-river-day-trip',
+    category: 'Day Trip',
+    sku: 'HR199',
+    description: 'Проведите день, приезжайте в Колумбию и наслаждаясь крафтовым пивом в Худ-Ривер!',
+    priceInCents: 9995,
+    tags: ['day trip', 'hood river', 'sailing', 'windsurfing', 'breweries'],
+    inSeason: true,
+    maximumGuests: 16,
+    available: true,
+    packagesSold: 0,
+  }).save();
+
+  new Vacation({
+    name: 'Oregon Coast Getaway',
+    slug: 'oregon-coast-getaway',
+    category: 'Weekend Getaway',
+    sku: 'OC39',
+    description: 'Наслаждайтесь океанским воздухом и странными прибрежными городами!',
+    priceInCents: 269995,
+    tags: ['weekend getaway', 'oregon coast', 'beachcombing'],
+    inSeason: true,
+    maximumGuests: 8,
+    available: true,
+    packagesSold: 0,
+  }).save();
+
+  new Vacation({
+    name: 'Rock Climbing in Bend',
+    slug: 'rock-climbing-in-bend',
+    category: 'Adventure',
+    sku: 'B99',
+    description: 'Испытайте острые ощущения скалолазания в высокой пустыне.',
+    priceInCents: 289995,
+    tags: ['weekend getaway', 'bend', 'high desert', 'rock climbing', 'hiking', 'skiing'],
+    inSeason: true,
+    requiresWaiver: false,
+    maximumGuests: 4,
+    available: false,
+    packagesSold: 0,
+    notes: 'Гид в настоящее время восстанавливается с лыжного несчастного случая.',
+  }).save();
 });
 
 // Обработчик событий Flash message 
@@ -186,187 +221,77 @@ app.use(function(req,res, next){
   next();
 });
 
-app.use('/upload', function(req, res, next){
-    var now = Date.now();
-    jqupload.fileHandler({
-        uploadDir: function(){
-            return __dirname + '/public/uploads/' + now;
-        },
-        uploadUrl: function(){
-            return '/uploads/' + now;
-        },
-    })(req, res, next);
+// app.use('/upload', function(req, res, next){
+//   let now = Date.now();
+//   jqupload.fileHandler({
+//     uploadDir: function(){
+//       return __dirname + '/public/uploads/' + now;
+//     },
+//     uploadUrl: function(){
+//       return '/uploads/' + now;
+//     },
+//   })(req, res, next);
+// });
+
+
+// app.get('/newsletter', function(req, res){
+//   res.render('newsletter', {csrf: "CSRF  token goes here" });
+// });
+
+
+// app.post('/vacations', function(req, res){
+//   Vacation.findOne({ sku: req.body.purchaseSku }, function(err, vacation){
+//     if(err || !vacation) {
+//       req.session.flash = {
+//         type: 'warning',
+//         intro: 'Упссс!',
+//         message: 'Что-то пошло не так, ваша вакансия не зарезервирована, пожалуйста <a href="/contact">свяжитесь с нами</a>.',
+//       };
+//       return res.redirect(303, '/vacations');
+//     }
+//     vacation.packagesSold++;
+//     vacation.save();
+//     req.session.flash = {
+//       type: 'success',
+//       intro: 'Спасибо!',
+//       message: 'Ваша вакация зарезервирована.',
+//     };
+//     res.redirect(303, '/vacations');
+//   });
+// });
+
+// Созадем admin субдомен, который должен быть ябъявлен
+// до всех маршрутов
+var admin = express.Router();
+app.use(require('vhost')('admin.*', admin));
+
+// Создаем маршруты для admin; могут быть объявлены где угодно
+admin.get('/', function(req, res){
+  res.render('admin/home');
+});
+admin.get('/users', function(req, res){
+  res.render('admin/users');
 });
 
-app.get('/newsletter', function(req, res){
-  res.render('newsletter', {csrf: "CSRF  token goes here" });
-});
 
-function NewsletterSignup(){
-};
-NewsletterSignup.prototype.save = function(cb){
-  cb();
-};
+// Добавляем маршруты
+require('./routes.js')(app);
 
-// Шаблон для искусственной базы данных
-function Product(){
-}
-Product.find = function(conditions, fields, options, cb){
-  if(typeof conditions==='function') {
-    cb = conditions;
-    conditions = {};
-    fields = null;
-    options = {};
-  } else if(typeof fields==='function') {
-    cb = fields;
-    fields = null;
-    options = {};
-  } else if(typeof options==='function') {
-    cb = options;
-    options = {};
-  }
-  var products = [
-    {
-      name: 'Hood River Tour',
-      slug: 'hood-river',
-      category: 'tour',
-      maximumGuests: 15,
-      sku: 723,
-    },
-    {
-      name: 'Oregon Coast Tour',
-      slug: 'oregon-coast',
-      category: 'tour',
-      maximumGuests: 10,
-      sku: 446,
-    },
-    {
-      name: 'Rock Climbing in Bend',
-      slug: 'rock-climbing/bend',
-      category: 'adventure',
-      requiresWaiver: true,
-      maximumGuests: 4,
-      sku: 944,
+// Доавляем поддержку auto views
+var autoViews = {};
+
+app.use(function(req,res,next){
+    var path = req.path.toLowerCase();  
+    // проверяем кэш; если присутствует рендерим view
+    if(autoViews[path]) return res.render(autoViews[path]);
+    // if it's not in the cache, see if there's
+    // a .handlebars file that matches
+    if(fs.existsSync(__dirname + '/views' + path + '.handlebars')){
+        autoViews[path] = path.replace(/^\//, '');
+        return res.render(autoViews[path]);
     }
-  ];
-  cb(null, products.filter(function(p) {
-    if(conditions.category && p.category!==conditions.category) return false;
-    if(conditions.slug && p.slug!==conditions.slug) return false;
-    if(isFinite(conditions.sku) && p.sku!==Number(conditions.sku)) return false;
-    return true;
-  }));
-};
-Product.findOne = function(conditions, fields, options, cb){
-  if(typeof conditions==='function') {
-    cb = conditions;
-    conditions = {};
-    fields = null;
-    options = {};
-  } else if(typeof fields==='function') {
-    cb = fields;
-    fields = null;
-    options = {};
-  } else if(typeof options==='function') {
-    cb = options;
-    options = {};
-  }
-  Product.find(conditions, fields, options, function(err, products){
-    cb(err, products && products.length ? products[0] : null);
-  });
-};
-
-var VALID_EMAIL_REGEX = /^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)+$/;
-
-app.post('/newsletter', function(req, res){
-  var name = req.body.name || '', email = req.body.email || '';
-  if(!email.match(VALID_EMAIL_REGEX)) {
-    if(req.xhr) return res.json({ error: 'Invalid name email address.'});
-    req.session.flash = {
-      type: 'danger',
-      intro: 'Validation error!',
-      message: 'The email address you entered was not valid.',
-    };
-    return res.redirect(303, '/newsletter/archive');
-  }
-  new NewsletterSignup({name: name, email: email}).save(function(err){
-    if(err) {
-      if(req.xhr) return res.json({error: 'Database error'});
-      req.session.flash = {
-        type: 'danger',
-        intro: 'Database error!',
-        message: 'There was a tatabase error; please try again later.'
-      };
-      return res.redirect(303, '/newsletter/archive');
-    };
-    if(req.xhr) return res.json({succes: true});
-    req.session.flash = {
-      type: 'succes',
-      intro: 'Thank you!',
-      message: 'You have now been signed up for the newsletter.'
-    };
-    return res.redirect(303, '/newsletter/archive');
-  });
-});
-
-app.get('/newsletter/archive', function(req, res){
-  res.render('newsletter/archive');
-});
-
-app.get('/contest/vacation-photo', function(req, res){
-  var now = new Date();
-  res.render('contest/vacation-photo', {
-    year: now.getFullYear(),
-    month: now.getMonth()
-  });
-});
-
-// Проверяем существует ли каталог
-var dataDir = __dirname + '/data';
-var vacationPhotoDir = dataDir + '/vacation-photo';
-if(!fs.existsSync(dataDir)) fs.mkdirSync(dataDir); 
-if(!fs.existsSync(vacationPhotoDir)) fs.mkdirSync(vacationPhotoDir);
-
-function saveContestEntry(contestName, email, year, month, photoPath){
-    // TODO...this will come later
-}
-
-app.post('/contest/vacation-photo/:year/:month', function(req, res){
-    var form = new formidable.IncomingForm();
-    form.parse(req, function(err, fields, files){
-        if(err) {
-            req.session.flash = {
-                type: 'danger',
-                intro: 'Oops!',
-                message: 'Во время обработки отправленной Вами формы произошла ошибка. Пожалуйста, попробуйте позже.',
-            };
-            return res.redirect(303, '/contest/vacation-photo');
-        }
-        var photo = files.photo;
-        var dir = vacationPhotoDir + '/' + Date.now();
-        var path = dir + '/' + photo.name;
-        fs.mkdirSync(dir);
-        fs.renameSync(photo.path, dir + '/' + photo.name);
-        saveContestEntry('vacation-photo', fields.email,
-            req.params.year, req.params.month, path);
-        req.session.flash = {
-            type: 'success',
-            intro: 'Удачи Вась!',
-            message: 'Поздравляю Вы стали участником конкурса.',
-        };
-        return res.redirect(303, '/contest/vacation-photo/entries');
-    });
-});
-
-app.get('/contest/vacation-photo/entries', function(req, res){
-  res.render('contest/vacation-photo/entries');
-});
-
-app.get('/vacation/:vacation', function(req, res, next){
-  Vacation.findOne({ slug: req.params.vacation }, function(err, vacation){
-    if(err) return next(err);
-    if(!vacation) return next();
-    res.render('vacation', { vacation: vacation });
-  });
+    // no view found; pass on to 404 handler
+    next();
 });
 
 app.post('/process', function(req, res){
@@ -379,25 +304,13 @@ app.post('/process', function(req, res){
 
 app.get('/headers', function(req, res){
   res.set('Content-Type', 'text/plain');
-  var s = '';
-  for(var name in req.headers) {
+  let s = '';
+  for(let name in req.headers) {
     s += name + ": " + req.headers[name] + '\n';
   }
   res.send(s);
 });
 
-app.get('/nursery-rhyme', function(req, res){
-  res.render('nursery-rhyme');
-});
-
-app.get('/data/nursery-rhyme', function(req, res){
-  res.json({
-    animal: 'бельчонок',
-    bodyPart: 'хвост',
-    adjective: 'пушистый',
-    noun: 'черт'
-  });
-});
 
 app.post('/process', function(req, res){
   if(req.xhr || req.accepts('json.html' )=== 'json'){
@@ -423,127 +336,20 @@ app.get('/jquery-test', function(req, res){
 //   res.render('tours/request-group-rate'); 
 // });
 
-app.get('/', function(req, res){
-  res.render('home');
-});
 
-app.get('/about', function(req,res){
-  res.render('about', { 
-    fortune: fortune.getFortune(),
-    pageTestScript: '/qa/tests-about.js' 
-  });
-});
+// app.post('/contest/vacation-photo/:year/:month', function(req, res){
+//   let form = new formidable. IncomingForm();
+//   form.parse(req, function(err, fields, files){
+//     if(err) return res.redirect(303, '/error');
+//     console.log('received fields:');
+//     console.log(fields);
+//     console.log('received files:');
+//     console.log(files);
+//     res.redirect(303, '/thank-you');
+//   });
+// });
 
-app.get('/thank-you', function(req, res){
-  res.render('thank-you');
-});
 
-app.post('/contest/vacation-photo/:year/:month', function(req, res){
-  var form = new formidable. IncomingForm();
-  form.parse(req, function(err, fields, files){
-    if(err) return res.redirect(303, '/error');
-    console.log('received fields:');
-    console.log(fields);
-    console.log('received files:');
-    console.log(files);
-    res.redirect(303, '/thank-you');
-  });
-});
-
-app.get('/tours/:tour', function(req, res, next){
-  Product.findOne({ category: 'tour', slug: req.params.tour }, function(err, tour){
-    if(err) return next(err);
-    if(!tour) return next();
-    res.render('tour', { tour: tour });
-  });
-});
-app.get('/adventures/:subcat/:name', function(req, res, next){
-  Product.findOne({ category: 'adventure', slug: req.params.subcat + '/' + req.params.name  }, function(err, adventure){
-    if(err) return next(err);
-    if(!adventure) return next();
-    res.render('adventure', { adventure: adventure });
-  });
-});
-
-var cartValidation = require('./lib/cartValidation.js');
-
-app.use(cartValidation.checkWaivers);
-app.use(cartValidation.checkGuestCounts);
-
-app.post('/cart/add', function(req, res, next){
-  var cart = req.session.cart || (req.session.cart = {items: [] });
-  Product.findOne({ sku: req.body.sku }, function(err, product){
-    if(err) return next(err);
-    if(!product) return next(new Error('Unknown product SKU: ' + req.body.sku));
-    cart.items.push({
-      product: product,
-      guests: req.body.guests || 0,
-    });
-    res.redirect(303, '/cart');
-  });
-});
-
-app.get('/fail', function(req, res){
-  throw new Error('Нет!');
-})
-app.get('/cart', function(req, res, next){
-  var cart = req.session.cart;
-  if(!cart) next();
-  res.render('cart', { cart: cart });
-});
-
-app.get('/cart/checkout', function(req, res, next){
-  var cart = req.session.cart;
-  if(!cart) next();
-  res.render('cart-checkout');
-});
-
-app.get('/cart/thank-you', function(req, res){
-  res.render('cart-thank-you', { cart: req.session.cart });
-});
-
-app.get('/email/cart/thank-you', function(req, res){
-  res.render('email/cart-thank-you', { cart: req.session.cart, layout: null });
-});
-
-app.post('/cart/checkout', function(req, res){
-  var cart = req.session.cart;
-  if(!cart) next(new Error('Корзина не существует.'));
-  var name = req.body.name || '',
-      email = req.body.email || '';
-  // проверка вводимых данных
-  if(!email.match(VALID_EMAIL_REGEX)){
-    return res.next(new Error('некорректный адресс электронной почты'));
-  }
-  //Присваиваем случайный идентификатор корзины
-  //При обычных условиях мы бы использовали здесь идентификатор из БД
-  cart.number = Math.random().toString().replace(/^0\.0*/,'');
-  cart.billing = {
-    name: name,
-    email: email,
-  },
-  res.render('email/cart-thank-you',{layout: null, cart: cart}, function(err,  html){
-    if(err) console.log('Ошибка в шаблоне письма');
-    transporter.sendMail({
-      from: '"Meadow-lark Travel": <info@meadowlarktravel.com>',
-      to: cart.billing.email,
-      subject: 'Спасибо за заказ поездки в Meadowlarktravel',
-      html: html,
-      generateTextFromHtml: true
-    }, function(err){
-      if(err){
-        console.error('Не могу отправить подтверждение: ' + err.stack);
-      }
-    });
-  });
-  res.render('cart-thank-you', {cart: cart});
-});
-
-app.get('/epic-fail', function(req, res){
-    process.nextTick(function(){
-        throw new Error('Бабах!');
-    });
-});
 
 // Обобщенный обработчик 404 (промежуточное ПО)
 app.use(function(req, res) {
@@ -558,14 +364,14 @@ app.use(function(err, req, res, next){
   res.render('500');
 });
 
-var server;
+let server;
 
 function startServer() {
-    server = http.createServer(app).listen(app.get('port'), function(){
-      console.log( 'Экспресс запущен в режиме ' + app.get('env') +
-        ' на http://localhost:' + app.get('port') +
-        '; нажми Ctrl-C для выхода.' );
-    });
+  server = http.createServer(app).listen(app.get('port'), function(){
+    console.log( 'Экспресс запущен в режиме ' + app.get('env') +
+      ' на http://localhost:' + app.get('port') +
+      '; нажми Ctrl-C для выхода.' );
+  });
 }
 
 if(require.main === module){
