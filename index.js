@@ -3,6 +3,7 @@ let express = require('express');
 let formidable = require('formidable');
 let nodemailer = require('nodemailer');
 let fs = require('fs');
+let vhost = require('vhost');
 let Vacation = require('./models/vacation.js');
 let VacationInSeasonListener = require('./models/vacationInSeasonListener.js');
 
@@ -42,7 +43,7 @@ app.use(function(req, res, next){
       setTimeout(function(){
         console.error('Отказобезопасный останов');
         process.exit(1);
-      }, 15000);
+      }, 5000);
 
       // Отключение от кластера
       let worker = require('cluster').worker;
@@ -106,7 +107,7 @@ app.use(require('body-parser').urlencoded({ extended: true }));
 //app.use(csurf);
 
 //конфигурация базы данных
-var mongoose = require('mongoose');
+let mongoose = require('mongoose');
 let options = {
   server: {
     socketOptions: { keepAlive: 1 }
@@ -260,9 +261,10 @@ app.use(function(req,res, next){
 //   });
 // });
 
+
 // Созадем admin субдомен, который должен быть ябъявлен
 // до всех маршрутов
-var admin = express.Router();
+let admin = express.Router();
 app.use(require('vhost')('admin.*', admin));
 
 // Создаем маршруты для admin; могут быть объявлены где угодно
@@ -277,12 +279,82 @@ admin.get('/users', function(req, res){
 // Добавляем маршруты
 require('./routes.js')(app);
 
+// api
+
+let Attraction = require('./models/attraction.js');
+
+
+let rest = require('connect-rest');
+
+rest.get('/attractions', function(req, content, cb){
+    Attraction.find({ approved: true }, function(err, attractions){
+        if(err) return cb({ error: 'Внутренняя ошибка.' });
+        cb(null, attractions.map(function(a){
+            return {
+                name: a.name,
+                description: a.description,
+                location: a.location,
+            };
+        }));
+    });
+});
+
+rest.post('/attraction', function(req, content, cb){
+    let a = new Attraction({
+        name: req.body.name,
+        description: req.body.description,
+        location: { lat: req.body.lat, lng: req.body.lng },
+        history: {
+            event: 'created',
+            email: req.body.email,
+            date: new Date(),
+        },
+        approved: false,
+    });
+    a.save(function(err, a){
+        if(err) return cb({ error: 'Невозможно добавить достопримечательность.' });
+        cb(null, { id: a._id });
+    }); 
+});
+
+rest.get('/attraction/:id', function(req, content, cb){
+    Attraction.findById(req.params.id, function(err, a){
+        if(err) return cb({ error: 'Невозможно получить достопримечательность' });
+        cb(null, { 
+            name: a.name,
+            description: a.description,
+            location: a.location,
+        });
+    });
+});
+
+// api Конфигурация
+let apiOptions = {
+    context: '/',
+    domain: require('domain').create(),
+};
+
+apiOptions.domain.on('error', function(err){
+    console.log('API ошибка домена\n', err.stack);
+    setTimeout(function(){
+        console.log('Сервер прекратил работу после API ошибки домена.');
+        process.exit(1);
+    }, 5000);
+    server.close();
+    let worker = require('cluster').worker;
+    if(worker) worker.disconnect();
+});
+
+// link API into pipeline
+app.use(vhost('api.*', rest.rester(apiOptions)));
+
+
 // Доавляем поддержку auto views
-var autoViews = {};
+let autoViews = {};
 
 app.use(function(req,res,next){
-    var path = req.path.toLowerCase();  
-    // проверяем кэш; если присутствует рендерим view
+    let path = req.path.toLowerCase();  
+    // проверяем кэш; если присутствует рендерим представления
     if(autoViews[path]) return res.render(autoViews[path]);
     // if it's not in the cache, see if there's
     // a .handlebars file that matches
@@ -290,7 +362,7 @@ app.use(function(req,res,next){
         autoViews[path] = path.replace(/^\//, '');
         return res.render(autoViews[path]);
     }
-    // no view found; pass on to 404 handler
+    // не нашли совпадения для маршрута; передаем ошибку в обработчик 404
     next();
 });
 
@@ -312,17 +384,13 @@ app.get('/headers', function(req, res){
 });
 
 
-app.post('/process', function(req, res){
-  if(req.xhr || req.accepts('json.html' )=== 'json'){
-    res.send({success: true});
-  } else {
-    res.redirect(303, '/thank-you');
-  }
-});
-
-app.get('/jquery-test', function(req, res){
-  res.render('jquery-test');
-});
+// app.post('/process', function(req, res){
+//   if(req.xhr || req.accepts('json.html' )=== 'json'){
+//     res.send({success: true});
+//   } else {
+//     res.redirect(303, '/thank-you');
+//   }
+// });
 
 // app.get('/tours/hood-river', function(req, res){
 //   res.render('tours/hood-river');

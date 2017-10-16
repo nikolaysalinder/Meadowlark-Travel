@@ -1,6 +1,6 @@
 module.exports = function(grunt){
 
-  // загруажем плагины
+  // Загружаем плагины
   [
     'grunt-cafe-mocha',
     'grunt-contrib-jshint',
@@ -15,14 +15,14 @@ module.exports = function(grunt){
       all: { src: 'qa/tests-*.js', options: { ui: 'tdd' }, }
     },
     jshint: {
-      app: ['index.js', 'public/js/**/*.js', 'lib/**/*.js'],
+      app: ['meadowlark.js', 'public/js/**/*.js', 'lib/**/*.js'],
       qa: ['Gruntfile.js', 'public/qa/**/*.js', 'qa/**/*.js'],
     },
     exec: {
-      //linkchecker: { cmd: 'linkchecker --ignore-url=\'!^(https?:)\/\/localhost\b\' http://localhost:3000' }
+      linkchecker: { cmd: 'linkchecker --ignore-url=\'!^(https?:)\/\/localhost\b\' http://localhost:3000' }
     },
   }); 
 
-  // регистрируем задачи
-  grunt.registerTask('default', ['cafemocha','jshint']);
+  // register tasks
+  grunt.registerTask('default', ['cafemocha','jshint','exec']);
 };

@@ -1,10 +1,10 @@
 var main = require('./handlers/main.js'),
-  contest = require('./handlers/contest.js'),
-  vacation = require('./handlers/vacation.js'),
-  cart = require('./handlers/cart.js'),
-  cartValidation = require('./lib/cartValidation.js'),
-  contact = require('./handlers/contact.js'),
-  samples = require('./handlers/sample.js');
+    contest = require('./handlers/contest.js'),
+    vacation = require('./handlers/vacation.js'),
+    cart = require('./handlers/cart.js'),
+    cartValidation = require('./lib/cartValidation.js'),
+    contact = require('./handlers/contact.js'),
+    samples = require('./handlers/sample.js');
 
 module.exports = function(app){
 
